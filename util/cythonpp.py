@@ -516,17 +516,21 @@ def atomic_write(filename, data):
     f.flush()
     os.fsync(f.fileno())
     f.close()
+    if os.path.exists(filename):
+        os.remove(filename)
     os.rename(tmpname, filename)
     dbg('Wrote %s bytes to %s', len(data), filename)
 
 
 def run_cython(filename, sourcehash, output_filename, banner, comment, cache={}):
+    import subprocess
     result = cache.get(sourcehash)
-    command = '%s -o %s %s' % (CYTHON, pipes.quote(output_filename), pipes.quote(filename))
+    command = [CYTHON, '-o', output_filename, filename]
     if result is not None:
         log('Reusing %s  # %s', command, comment)
         return result
-    system(command, comment)
+    log('Running %s', (command,))
+    subprocess.check_call(command)
     result = postprocess_cython_output(output_filename, banner)
     cache[sourcehash] = result
     return result

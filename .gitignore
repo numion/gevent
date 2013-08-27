@@ -1,7 +1,12 @@
+*.egg-info
+.installed.cfg
 *.py[co]
-build/
 *.so
+bin/
+build/
+develop-eggs/
+dist/
+eggs/
 gevent.*.[ch]
 gevent/core.pyx
-*.egg-info
-
+parts/
