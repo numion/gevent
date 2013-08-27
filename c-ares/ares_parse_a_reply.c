@@ -52,8 +52,7 @@
 #include "ares_private.h"
 
 int ares_parse_a_reply(const unsigned char *abuf, int alen,
-                       struct hostent **host,
-                       struct ares_addrttl *addrttls, int *naddrttls)
+                       struct hostent **host)
 {
   unsigned int qdcount, ancount;
   int status, i, rr_type, rr_class, rr_len, rr_ttl, naddrs;
@@ -62,16 +61,12 @@ int ares_parse_a_reply(const unsigned char *abuf, int alen,
   long len;
   const unsigned char *aptr;
   char *hostname, *rr_name, *rr_data, **aliases;
-  struct in_addr *addrs;
+  struct ares_addrttl *addrs;
   struct hostent *hostent;
-  const int max_addr_ttls = (addrttls && naddrttls) ? *naddrttls : 0;
 
   /* Set *host to NULL for all failure cases. */
   if (host)
     *host = NULL;
-  /* Same with *naddrttls. */
-  if (naddrttls)
-    *naddrttls = 0;
 
   /* Give up if abuf doesn't have room for a header. */
   if (alen < HFIXEDSZ)
@@ -99,7 +94,7 @@ int ares_parse_a_reply(const unsigned char *abuf, int alen,
     {
       /* Allocate addresses and aliases; ancount gives an upper bound for
          both. */
-      addrs = malloc(ancount * sizeof(struct in_addr));
+      addrs = malloc(ancount * sizeof(struct ares_addrttl));
       if (!addrs)
         {
           free(hostname);
@@ -148,17 +143,7 @@ int ares_parse_a_reply(const unsigned char *abuf, int alen,
         {
           if (addrs)
             {
-              if (aptr + sizeof(struct in_addr) > abuf + alen)
-              {
-                free(rr_name);
-                status = ARES_EBADRESP;
-                break;
-              }
-              memcpy(&addrs[naddrs], aptr, sizeof(struct in_addr));
-            }
-          if (naddrs < max_addr_ttls)
-            {
-              struct ares_addrttl * const at = &addrttls[naddrs];
+              struct ares_addrttl * const at = &addrs[naddrs];
               if (aptr + sizeof(struct in_addr) > abuf + alen)
               {
                 free(rr_name);
@@ -211,16 +196,14 @@ int ares_parse_a_reply(const unsigned char *abuf, int alen,
   if (status == ARES_SUCCESS)
     {
       /* We got our answer. */
-      if (naddrttls)
+      if (addrs)
         {
-          const int n = naddrs < max_addr_ttls ? naddrs : max_addr_ttls;
-          for (i = 0; i < n; i++)
+          for (i = 0; i < naddrs; i++)
             {
               /* Ensure that each A TTL is no larger than the CNAME TTL. */
-              if (addrttls[i].ttl > cname_ttl)
-                addrttls[i].ttl = cname_ttl;
+              if (addrs[i].ttl > cname_ttl)
+                addrs[i].ttl = cname_ttl;
             }
-          *naddrttls = n;
         }
       if (aliases)
         aliases[naliases] = NULL;
@@ -237,7 +220,7 @@ int ares_parse_a_reply(const unsigned char *abuf, int alen,
                   hostent->h_name = hostname;
                   hostent->h_aliases = aliases;
                   hostent->h_addrtype = AF_INET;
-                  hostent->h_length = sizeof(struct in_addr);
+                  hostent->h_length = sizeof(struct ares_addrttl);
                   for (i = 0; i < naddrs; i++)
                     hostent->h_addr_list[i] = (char *) &addrs[i];
                   hostent->h_addr_list[naddrs] = NULL;

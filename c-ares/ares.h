@@ -508,15 +508,11 @@ struct ares_soa_reply {
 
 CARES_EXTERN int ares_parse_a_reply(const unsigned char *abuf,
                                     int alen,
-                                    struct hostent **host,
-                                    struct ares_addrttl *addrttls,
-                                    int *naddrttls);
+                                    struct hostent **host);
 
 CARES_EXTERN int ares_parse_aaaa_reply(const unsigned char *abuf,
                                        int alen,
-                                       struct hostent **host,
-                                       struct ares_addr6ttl *addrttls,
-                                       int *naddrttls);
+                                       struct hostent **host);
 
 CARES_EXTERN int ares_parse_ptr_reply(const unsigned char *abuf,
                                       int alen,

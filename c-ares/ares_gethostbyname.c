@@ -46,6 +46,7 @@
 #endif
 
 #include "ares.h"
+#include "ares_dns.h"
 #include "inet_net_pton.h"
 #include "bitncmp.h"
 #include "ares_platform.h"
@@ -188,13 +189,13 @@ static void host_callback(void *arg, int status, int timeouts,
     {
       if (hquery->sent_family == AF_INET)
         {
-          status = ares_parse_a_reply(abuf, alen, &host, NULL, NULL);
-          if (host && channel->nsort)
-            sort_addresses(host, channel->sortlist, channel->nsort);
+          status = ares_parse_a_reply(abuf, alen, &host);
+          //~ if (host && channel->nsort)
+            //~ sort_addresses(host, channel->sortlist, channel->nsort);
         }
       else if (hquery->sent_family == AF_INET6)
         {
-          status = ares_parse_aaaa_reply(abuf, alen, &host, NULL, NULL);
+          status = ares_parse_aaaa_reply(abuf, alen, &host);
           if ((status == ARES_ENODATA || status == ARES_EBADRESP) &&
                hquery->want_family == AF_UNSPEC) {
             /* The query returned something but either there were no AAAA
@@ -205,8 +206,8 @@ static void host_callback(void *arg, int status, int timeouts,
                         host_callback, hquery);
             return;
           }
-          if (host && channel->nsort)
-            sort6_addresses(host, channel->sortlist, channel->nsort);
+          //~ if (host && channel->nsort)
+            //~ sort6_addresses(host, channel->sortlist, channel->nsort);
         }
       end_hquery(hquery, status, host);
     }

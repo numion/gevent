@@ -21,6 +21,7 @@ cdef extern from "dnshelper.c":
     struct hostent:
         char* h_name
         int h_addrtype
+        void** h_addr_list
 
     struct sockaddr_t "sockaddr":
         pass
@@ -38,6 +39,12 @@ cdef extern from "dnshelper.c":
     int PyArg_ParseTuple(object, char*, ...) except 0
     struct sockaddr_in6:
         pass
+    struct ares_addrttl:
+        unsigned char[4] name
+        int ttl
+    struct ares_addr6ttl:
+        unsigned char[16] name
+        int ttl
     int gevent_make_sockaddr(char* hostp, int port, int flowinfo, int scope_id, sockaddr_in6* sa6)
 
     void* malloc(int)
@@ -179,14 +186,52 @@ cdef class result:
 
 class ares_host_result(tuple):
 
-    def __new__(cls, family, iterable):
+    def __new__(cls, family, ttl, iterable):
         cdef object self = tuple.__new__(cls, iterable)
         self.family = family
+        self.ttl = ttl
         return self
 
     def __getnewargs__(self):
         return (self.family, tuple(self))
 
+
+cdef parse_ttl(hostent* host):
+    cdef ares_addrttl **addr_list
+    cdef ares_addr6ttl **addr6_list
+    cdef ares_addrttl *addr
+    cdef ares_addr6ttl *addr6
+    cdef int ttl
+    cdef int i
+    ttl = 0
+    if host.h_addrtype == AF_INET:
+        addr_list = <ares_addrttl **>host.h_addr_list
+        addr = addr_list[0]
+        if addr is NULL:
+            return ttl
+        ttl = addr.ttl
+        addr = addr_list[1]
+        i = 2
+        while addr is not NULL:
+            if addr.ttl < ttl:
+                ttl = addr.ttl
+            addr = addr_list[i]
+            i += 1
+    elif host.h_addrtype == AF_INET6:
+        addr6_list = <ares_addr6ttl **>host.h_addr_list
+        addr6 = addr6_list[0]
+        if addr6 is NULL:
+            return ttl
+        ttl = addr6.ttl
+        addr6 = addr6_list[1]
+        i = 2
+        while addr6 is not NULL:
+            if addr6.ttl < ttl:
+                ttl = addr6.ttl
+            addr6 = addr6_list[i]
+            i += 1
+    return ttl
+    
 
 cdef void gevent_ares_host_callback(void *arg, int status, int timeouts, hostent* host):
     cdef channel channel
@@ -199,7 +244,7 @@ cdef void gevent_ares_host_callback(void *arg, int status, int timeouts, hostent
             callback(result(None, gaierror(status, strerror(status))))
         else:
             try:
-                host_result = ares_host_result(host.h_addrtype, (host.h_name, parse_h_aliases(host), parse_h_addr_list(host)))
+                host_result = ares_host_result(host.h_addrtype, parse_ttl(host), (host.h_name, parse_h_aliases(host), parse_h_addr_list(host)))
             except:
                 callback(result(None, sys.exc_info()[1]))
             else:
